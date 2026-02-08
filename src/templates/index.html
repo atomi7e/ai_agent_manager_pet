@@ -2,12 +2,18 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Planner 8.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AI Planner Super App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #0f0f0f; color: #fff; font-family: sans-serif; padding: 15px; margin: 0; }
-        .card { background: #1f1f1f; border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid #333; }
+        body { background-color: #0f0f0f; color: #fff; font-family: -apple-system, sans-serif; margin: 0; padding: 0; padding-bottom: 80px; }
+        .container { padding: 15px; }
+        
+        /* КАРТОЧКИ */
+        .card { background: #1f1f1f; border-radius: 16px; padding: 20px; margin-bottom: 15px; border: 1px solid #333; }
+        
+        /* ПРОФИЛЬ */
         .profile-header { display: flex; align-items: center; justify-content: space-between; }
         .username { font-size: 20px; font-weight: bold; margin: 0; }
         .title-badge { font-size: 12px; background: #333; color: #aaa; padding: 4px 8px; border-radius: 6px; margin-top: 5px; display: inline-block; }
@@ -16,46 +22,216 @@
         .stat-box { flex: 1; background: #2a2a2a; padding: 10px; border-radius: 10px; text-align: center; }
         .stat-val { font-size: 18px; font-weight: bold; color: #0088cc; }
         .stat-label { font-size: 12px; color: #777; }
-        .achievements-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
-        .ach-badge { background: #2a402a; color: #4caf50; font-size: 11px; padding: 5px 10px; border-radius: 15px; border: 1px solid #4caf50; }
-        .task { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid #0088cc; }
-        .task-txt { font-size: 14px; line-height: 1.4; }
-        .date { font-size: 11px; color: #555; margin-top: 5px; display: block; }
-        .btn { background: #0088cc; color: white; width: 100%; padding: 15px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        
+        /* ЗАДАЧИ */
+        .task { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px; transition: 0.3s; }
+        .task.done { opacity: 0.5; background: #111; }
+        .checkbox { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #0088cc; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .checkbox.checked { background: #0088cc; }
+        .checkbox i { display: none; color: white; font-size: 14px; }
+        .checkbox.checked i { display: block; }
+        .task-content { flex: 1; }
+        .task-txt { font-size: 14px; }
+        
+        /* ВВОД ЗАДАЧИ */
+        .new-task-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        .new-task-input { flex: 1; background: #2a2a2a; border: none; color: white; padding: 12px; border-radius: 10px; font-size: 16px; }
+        .new-task-btn { background: #0088cc; border: none; color: white; width: 50px; border-radius: 10px; font-size: 24px; cursor: pointer; }
+
+        /* МАГАЗИН */
+        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .shop-item { background: #2a2a2a; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #444; }
+        .shop-name { font-weight: bold; margin-bottom: 5px; display: block; }
+        .shop-price { color: gold; font-size: 14px; margin-bottom: 10px; display: block; }
+        .buy-btn { background: #0088cc; color: white; border: none; padding: 8px 15px; border-radius: 8px; width: 100%; font-weight: bold; }
+
+        /* ЛИДЕРБОРД */
+        .leader-row { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #333; }
+        .leader-rank { width: 30px; font-weight: bold; color: #666; }
+        .leader-xp { font-weight: bold; color: gold; }
+
+        /* ТАЙМЕР */
+        .timer-circle { width: 200px; height: 200px; border: 5px solid #0088cc; border-radius: 50%; margin: 50px auto; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: bold; }
+        .timer-controls { display: flex; justify-content: center; gap: 20px; }
+        .timer-btn { background: #333; color: white; border: none; padding: 15px 30px; border-radius: 12px; font-size: 18px; font-weight: bold; }
+
+        /* НИЖНЯЯ НАВИГАЦИЯ */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a1a; display: flex; justify-content: space-around; padding: 15px 0; border-top: 1px solid #333; z-index: 100; }
+        .nav-item { color: #666; text-align: center; font-size: 12px; flex: 1; }
+        .nav-item.active { color: #0088cc; }
+        .nav-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+        /* ВКЛАДКИ */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <div class="profile-header">
-            <div>
-                <h1 class="username">{{ username }}</h1>
-                <span class="title-badge">{{ title }}</span>
+
+    <div id="tab-home" class="tab-content active container">
+        <div class="card">
+            <div class="profile-header">
+                <div><h1 class="username">{{ username }}</h1><span class="title-badge">{{ title }}</span></div>
+                <div class="level-circle">{{ level }}</div>
             </div>
-            <div class="level-circle">{{ level }}</div>
+            <div class="stats-row">
+                <div class="stat-box"><div class="stat-val" id="coins-val">{{ coins }} 🪙</div><div class="stat-label">Монеты</div></div>
+                <div class="stat-box"><div class="stat-val">{{ xp }}</div><div class="stat-label">XP</div></div>
+            </div>
         </div>
-        <div class="stats-row">
-            <div class="stat-box"><div class="stat-val">{{ coins }} 🪙</div><div class="stat-label">Монеты</div></div>
-            <div class="stat-box"><div class="stat-val">{{ xp }}</div><div class="stat-label">XP</div></div>
+
+        <div class="card">
+            <div style="height: 150px;"><canvas id="xpChart"></canvas></div>
         </div>
-        {% if achievements %}
-        <div style="margin-top: 15px; font-size: 12px; color: #888;">ДОСТИЖЕНИЯ:</div>
-        <div class="achievements-grid">
-            {% for ach in achievements %}
-            <div class="ach-badge">🏆 {{ ach }}</div>
+
+        <h3>📝 МОИ ЗАДАЧИ</h3>
+        <div class="new-task-box">
+            <input type="text" id="new-task-input" class="new-task-input" placeholder="Новая задача...">
+            <button class="new-task-btn" onclick="createTask()">+</button>
+        </div>
+
+        <div id="tasks-list">
+            {% for plan in plans %}
+            <div class="task {% if plan.is_completed %}done{% endif %}" id="task-{{ plan.id }}">
+                <div class="checkbox {% if plan.is_completed %}checked{% endif %}" onclick="completeTask({{ plan.id }}, {{ plan.is_completed }})"><i>✔</i></div>
+                <div class="task-content"><div class="task-txt">{{ plan.task_text }}</div></div>
+            </div>
             {% endfor %}
         </div>
-        {% endif %}
     </div>
 
-    <h3 style="color: #666; font-size: 14px; margin-bottom: 10px;">ПОСЛЕДНИЕ ЗАДАЧИ</h3>
-    {% for plan in plans %}
-    <div class="task">
-        <div class="task-txt">{{ plan.task_text }}</div>
-        <span class="date">{{ plan.created_at }}</span>
+    <div id="tab-shop" class="tab-content container">
+        <h2>🏪 Магазин Титулов</h2>
+        <div class="shop-grid">
+            {% for item in shop_items %}
+            <div class="shop-item">
+                <span class="shop-name">{{ item.name }}</span>
+                <span class="shop-price">{{ item.price }} 🪙</span>
+                <button class="buy-btn" onclick="buyItem('{{ item.slug }}')">Купить</button>
+            </div>
+            {% endfor %}
+        </div>
     </div>
-    {% endfor %}
 
-    <button class="btn" onclick="Telegram.WebApp.close()">Закрыть</button>
-    <script>Telegram.WebApp.ready(); Telegram.WebApp.expand();</script>
+    <div id="tab-leaders" class="tab-content container">
+        <h2>🏆 Топ Лидеров</h2>
+        <div id="leaders-list" class="card">Загрузка...</div>
+    </div>
+
+    <div id="tab-focus" class="tab-content container">
+        <h2>🍅 Таймер</h2>
+        <div class="timer-circle" id="timer-display">25:00</div>
+        <div class="timer-controls">
+            <button class="timer-btn" style="background:#0088cc" onclick="startTimer()">Старт</button>
+            <button class="timer-btn" onclick="resetTimer()">Сброс</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('home', this)"><span class="nav-icon">🏠</span>Главная</div>
+        <div class="nav-item" onclick="switchTab('shop', this)"><span class="nav-icon">🏪</span>Магазин</div>
+        <div class="nav-item" onclick="switchTab('leaders', this); loadLeaders()"><span class="nav-icon">🏆</span>Топ</div>
+        <div class="nav-item" onclick="switchTab('focus', this)"><span class="nav-icon">🍅</span>Фокус</div>
+    </div>
+
+    <script>
+        Telegram.WebApp.ready(); Telegram.WebApp.expand();
+        const userId = Telegram.WebApp.initDataUnsafe.user?.id || 12345; // Фолбек для теста
+
+        // --- НАВИГАЦИЯ ---
+        function switchTab(tabId, navElement) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            navElement.classList.add('active');
+        }
+
+        // --- ЗАДАЧИ ---
+        async function completeTask(id, isDone) {
+            if (isDone) return;
+            document.getElementById(`task-${id}`).classList.add('done');
+            document.querySelector(`#task-${id} .checkbox`).classList.add('checked');
+            
+            let res = await fetch(`/api/complete/${id}?user_id=${userId}`, {method: 'POST'});
+            let data = await res.json();
+            if(data.status === 'success') {
+                Telegram.WebApp.showAlert(data.reward);
+                document.getElementById('coins-val').innerText = data.new_coins + " 🪙";
+            }
+        }
+
+        async function createTask() {
+            let input = document.getElementById('new-task-input');
+            let text = input.value;
+            if(!text) return;
+            input.value = "Создаю...";
+            
+            let res = await fetch('/api/tasks/create', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: userId, text: text})
+            });
+            let data = await res.json();
+            
+            // Добавляем в список (просто перезагрузим страницу для простоты, или добавим DOM элемент)
+            location.reload(); 
+        }
+
+        // --- МАГАЗИН ---
+        async function buyItem(slug) {
+            let res = await fetch(`/api/buy/${slug}?user_id=${userId}`, {method: 'POST'});
+            let data = await res.json();
+            Telegram.WebApp.showAlert(data.message);
+            if(data.status === 'info' && data.message.includes('Куплено')) location.reload();
+        }
+
+        // --- ЛИДЕРБОРД ---
+        async function loadLeaders() {
+            let res = await fetch('/api/leaderboard');
+            let data = await res.json();
+            let html = "";
+            data.leaders.forEach((l, i) => {
+                html += `<div class="leader-row"><div class="leader-rank">#${i+1}</div><div>${l.username}</div><div class="leader-xp">${l.xp} XP</div></div>`;
+            });
+            document.getElementById('leaders-list').innerHTML = html;
+        }
+
+        // --- ТАЙМЕР ---
+        let timerInterval;
+        let timeLeft = 25 * 60;
+        function startTimer() {
+            if(timerInterval) return;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                let s = (timeLeft % 60).toString().padStart(2, '0');
+                document.getElementById('timer-display').innerText = `${m}:${s}`;
+                if(timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    Telegram.WebApp.showAlert("Время вышло! Отдохни.");
+                }
+            }, 1000);
+        }
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timeLeft = 25 * 60;
+            document.getElementById('timer-display').innerText = "25:00";
+        }
+
+        // --- ГРАФИК ---
+        const ctx = document.getElementById('xpChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ chart_labels | tojson }},
+                datasets: [{
+                    label: 'XP', data: {{ chart_data | tojson }},
+                    borderColor: '#0088cc', backgroundColor: 'rgba(0,136,204,0.1)', fill: true, tension: 0.4
+                }]
+            },
+            options: { plugins: {legend: {display: false}}, maintainAspectRatio: false, scales: { x: {display: false}, y: {display: false} } }
+        });
+    </script>
 </body>
 </html>
