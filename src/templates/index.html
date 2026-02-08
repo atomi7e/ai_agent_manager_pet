@@ -3,97 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Planner App</title>
+    <title>AI Planner 8.0</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        .card {
-            background: #1e1e1e;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .level-badge {
-            background: linear-gradient(45deg, #FFD700, #FFA500);
-            color: black;
-            font-weight: bold;
-            padding: 5px 15px;
-            border-radius: 20px;
-        }
-        .progress-bar {
-            background: #333;
-            height: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            background: #0088cc;
-            height: 100%;
-            width: {{ progress }}%; /* Это вставит Python */
-            transition: width 0.5s;
-        }
-        h2 { margin-top: 0; font-size: 18px; color: #aaa; }
-        .task-item {
-            background: #2c2c2c;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            border-left: 4px solid #0088cc;
-        }
-        .btn {
-            background: #0088cc;
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 20px;
-        }
+        body { background-color: #0f0f0f; color: #fff; font-family: sans-serif; padding: 15px; margin: 0; }
+        .card { background: #1f1f1f; border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid #333; }
+        .profile-header { display: flex; align-items: center; justify-content: space-between; }
+        .username { font-size: 20px; font-weight: bold; margin: 0; }
+        .title-badge { font-size: 12px; background: #333; color: #aaa; padding: 4px 8px; border-radius: 6px; margin-top: 5px; display: inline-block; }
+        .level-circle { background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; }
+        .stats-row { display: flex; gap: 10px; margin-top: 15px; }
+        .stat-box { flex: 1; background: #2a2a2a; padding: 10px; border-radius: 10px; text-align: center; }
+        .stat-val { font-size: 18px; font-weight: bold; color: #0088cc; }
+        .stat-label { font-size: 12px; color: #777; }
+        .achievements-grid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .ach-badge { background: #2a402a; color: #4caf50; font-size: 11px; padding: 5px 10px; border-radius: 15px; border: 1px solid #4caf50; }
+        .task { background: #1a1a1a; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid #0088cc; }
+        .task-txt { font-size: 14px; line-height: 1.4; }
+        .date { font-size: 11px; color: #555; margin-top: 5px; display: block; }
+        .btn { background: #0088cc; color: white; width: 100%; padding: 15px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
     </style>
 </head>
 <body>
-
     <div class="card">
-        <div class="header">
-            <h1 style="margin:0;">Профиль</h1>
-            <span class="level-badge">LVL {{ level }}</span>
+        <div class="profile-header">
+            <div>
+                <h1 class="username">{{ username }}</h1>
+                <span class="title-badge">{{ title }}</span>
+            </div>
+            <div class="level-circle">{{ level }}</div>
         </div>
-        <p style="color: #888;">Опыт: {{ xp }} XP</p>
-        <div class="progress-bar">
-            <div class="progress-fill"></div>
+        <div class="stats-row">
+            <div class="stat-box"><div class="stat-val">{{ coins }} 🪙</div><div class="stat-label">Монеты</div></div>
+            <div class="stat-box"><div class="stat-val">{{ xp }}</div><div class="stat-label">XP</div></div>
         </div>
+        {% if achievements %}
+        <div style="margin-top: 15px; font-size: 12px; color: #888;">ДОСТИЖЕНИЯ:</div>
+        <div class="achievements-grid">
+            {% for ach in achievements %}
+            <div class="ach-badge">🏆 {{ ach }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
-    <h2>📂 ПОСЛЕДНИЕ ЗАДАЧИ</h2>
+    <h3 style="color: #666; font-size: 14px; margin-bottom: 10px;">ПОСЛЕДНИЕ ЗАДАЧИ</h3>
     {% for plan in plans %}
-    <div class="task-item">
-        <b>{{ plan.task_text }}</b><br>
-        <span style="font-size: 12px; color: #666;">{{ plan.created_at }}</span>
+    <div class="task">
+        <div class="task-txt">{{ plan.task_text }}</div>
+        <span class="date">{{ plan.created_at }}</span>
     </div>
     {% endfor %}
 
-    <button class="btn" onclick="Telegram.WebApp.close()">ЗАКРЫТЬ</button>
-
-    <script>
-        // Инициализация Telegram WebApp
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand(); // Раскрыть на весь экран
-    </script>
+    <button class="btn" onclick="Telegram.WebApp.close()">Закрыть</button>
+    <script>Telegram.WebApp.ready(); Telegram.WebApp.expand();</script>
 </body>
 </html>
