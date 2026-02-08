@@ -12,13 +12,23 @@ class AIPlannerService:
         self.model = genai.GenerativeModel(model_name=self.model_name)
         self.chats = {}
 
-    async def get_plan(self, user_id: int, user_text: str, role_prompt: str = "", image_file=None, audio_file=None) -> str:
+    async def get_plan(self, user_id: int, user_text: str, role_prompt: str = "", image_file=None, audio_file=None, user_facts: list = None) -> str:
+        """
+        Генерирует план, учитывая факты о пользователе
+        """
+        facts_str = ""
+        if user_facts:
+            facts_str = "ЧТО Я ЗНАЮ О ТЕБЕ:\n" + "\n".join([f"- {f}" for f in user_facts]) + "\n\n"
+
         full_prompt = f"""
         {role_prompt}
-        Задача: Составь план действий. Разбей на 3-6 шагов. Без вступлений.
-        Запрос: {user_text}
+        
+        {facts_str}
+        
+        Задача: Составь план действий. Разбей на 3-6 шагов.
+        Запрос пользователя: {user_text}
         """
-        # (Логика чата остается прежней)
+        
         if user_id not in self.chats: self.chats[user_id] = self.model.start_chat(history=[])
         try:
             chat = self.chats[user_id]
@@ -31,31 +41,34 @@ class AIPlannerService:
         except Exception as e:
             return f"Ошибка AI: {e}"
 
-    async def generate_quiz(self):
-        """Генерирует вопрос для викторины"""
-        topics = ["Python programming", "Cybersecurity", "Logic puzzles", "Science facts", "History"]
-        topic = random.choice(topics)
-        
+    async def extract_facts(self, text: str):
+        """Пытается найти факты о юзере в тексте"""
         prompt = f"""
-        Create a multiple-choice quiz question about {topic}.
-        Strictly follow this format with '|' separator:
-        QUESTION | OPTION_A | OPTION_B | OPTION_C | OPTION_D | CORRECT_OPTION_INDEX (0, 1, 2, or 3)
+        Analyze the following user message. Does it contain any PERMANENT facts about the user (e.g., their name, profession, hobbies, technologies they study, goals)?
         
-        Example:
-        What is 2+2? | 3 | 4 | 5 | 6 | 1
+        Message: "{text}"
+        
+        If YES, extract the fact as a short sentence in Russian.
+        If NO, return "None".
+        Only return the fact or "None". Do not add extra text.
         """
-        
         try:
             response = await self.model.generate_content_async(prompt)
-            text = response.text.strip()
-            parts = text.split('|')
+            result = response.text.strip()
+            if "None" in result or len(result) < 3:
+                return None
+            return result
+        except:
+            return None
+
+    async def generate_quiz(self):
+        topics = ["Python", "Cybersecurity", "Logic", "Science", "History"]
+        topic = random.choice(topics)
+        prompt = f"Create a multiple-choice quiz about {topic}. Format: QUESTION | A | B | C | D | CORRECT_INDEX (0-3)"
+        try:
+            response = await self.model.generate_content_async(prompt)
+            parts = response.text.strip().split('|')
             if len(parts) >= 6:
-                return {
-                    "question": parts[0].strip(),
-                    "options": [p.strip() for p in parts[1:5]],
-                    "correct_index": int(parts[5].strip())
-                }
+                return {"question": parts[0].strip(), "options": [p.strip() for p in parts[1:5]], "correct_index": int(parts[5].strip())}
             return None
-        except Exception as e:
-            logging.error(f"Quiz Error: {e}")
-            return None
+        except: return None

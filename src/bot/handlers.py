@@ -2,10 +2,11 @@ import io
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import ContextTypes
 from src.services.ai_service import AIPlannerService
-# Импортируем ВСЕ функции, включая старые для совместимости
+# Импортируем ВСЕ функции из базы данных (включая новые для памяти)
 from src.database import (
     save_plan, get_last_plans, add_rewards, get_user_profile, 
     get_leaderboard, update_user_meta, check_achievements_unlock, buy_item,
+    save_fact, get_user_facts, clear_memory, # <--- Новые функции памяти
     get_user_stats, add_xp 
 )
 
@@ -19,20 +20,48 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = user.username if user.username else user.first_name
     await update_user_meta(user.id, name)
     
-    # 👇👇👇 ВСТАВЬ СВОЮ NGROK ССЫЛКУ 👇👇👇
+    # 👇👇👇 ВСТАВЬ СЮДА СВОЮ ССЫЛКУ NGROK 👇👇👇
     NGROK_URL = "https://arrythmic-improvisatory-angela.ngrok-free.dev"
     WEB_APP_URL = f"{NGROK_URL}?user_id={user.id}"
     
     keyboard = [
         [KeyboardButton("🚀 ОТКРЫТЬ MINI APP", web_app=WebAppInfo(url=WEB_APP_URL))],
+        [KeyboardButton("🍅 ФОКУС (25 мин)"), KeyboardButton("🧠 Память")], # Новые кнопки
         [KeyboardButton("🏪 Магазин"), KeyboardButton("📝 Новая задача")],
         [KeyboardButton("👤 Профиль"), KeyboardButton("🏆 Рейтинг")],
         [KeyboardButton("📂 История"), KeyboardButton("🎮 Мини-игра")]
     ]
     markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(f"Привет, {name}! v8.0: Экономика, Магазин и Ачивки! 🚀", reply_markup=markup)
+    await update.message.reply_text(f"Привет, {name}! v9.0: Я теперь умею запоминать факты и помогать с фокусом! 🧠🍅", reply_markup=markup)
 
-# --- НОВЫЕ ФУНКЦИИ (Магазин, Лидерборд) ---
+# --- НОВЫЕ ФУНКЦИИ (Фокус и Память) ---
+
+async def focus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Помодоро таймер"""
+    chat_id = update.effective_chat.id
+    # Ставим таймер на 25 минут (1500 сек)
+    context.job_queue.run_once(alarm, 1500, chat_id=chat_id, data="🍅 Помодоро закончен! Отдохни 5 минут.")
+    await update.message.reply_text("🍅 **Режим фокусировки включен!**\nРаботай 25 минут, я напишу, когда время выйдет. Удачи!", parse_mode="Markdown")
+
+async def memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает, что знает бот"""
+    user_id = update.effective_user.id
+    facts = await get_user_facts(user_id)
+    
+    if not facts:
+        await update.message.reply_text("🧠 Я пока ничего особенного о тебе не запомнил.\nРасскажи мне о своих увлечениях!")
+        return
+        
+    text = "🧠 **Что я помню о тебе:**\n\n" + "\n".join([f"📌 {f}" for f in facts])
+    text += "\n\n(Чтобы очистить память, напиши /forget)"
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+async def forget_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await clear_memory(update.effective_user.id)
+    await update.message.reply_text("🗑 Память очищена. Я забыл всё, что знал о тебе.")
+
+# --- МАГАЗИН И ПРОФИЛЬ ---
+
 async def shop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     profile = await get_user_profile(user_id)
@@ -71,7 +100,8 @@ async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         text += f"{medal} [{r['active_title']}] **{r['username']}** — {r['xp']} XP\n"
     await update.message.reply_text(text, parse_mode="Markdown")
 
-# --- СТАРЫЕ ВАЖНЫЕ ФУНКЦИИ (Возвращены!) ---
+# --- ЗАДАЧИ И ИСТОРИЯ ---
+
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     plans = await get_last_plans(user_id)
@@ -112,12 +142,17 @@ async def send_plan_response(update, plan_text, source_type, user_original_text)
     final_task_text = f"[{source_type}] {user_original_text}"
     await save_plan(user_id, final_task_text, plan_text)
 
-# --- ОБРАБОТЧИКИ ТИПОВ СООБЩЕНИЙ ---
+# --- ОБРАБОТЧИКИ СООБЩЕНИЙ ---
+
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user = update.effective_user
-    await update_user_meta(user.id, user.username or user.first_name)
+    user_id = update.effective_user.id
+    await update_user_meta(user_id, update.effective_user.first_name)
 
+    # Роутинг команд
+    if text == "🍅 ФОКУС (25 мин)": return await focus_command(update, context)
+    if text == "🧠 Память": return await memory_command(update, context)
+    
     if text == "🏪 Магазин": return await shop_command(update, context)
     if text == "🏆 Рейтинг": return await leaderboard_command(update, context)
     if text == "🎮 Мини-игра": return await play_quiz(update, context)
@@ -130,10 +165,22 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await update.message.reply_text("Выбери роль:", reply_markup=InlineKeyboardMarkup(keyboard))
     if text == "📝 Новая задача": return await update.message.reply_text("Напиши задачу текстом...")
 
+    # Обработка задачи с AI и памятью
     msg = await update.message.reply_text("🧠 Думаю...")
-    role = user_roles.get(user.id, ROLES["standard"])
-    plan = await ai_service.get_plan(user.id, text, role_prompt=role)
+    
+    # 1. Извлекаем факты
+    extracted_fact = await ai_service.extract_facts(text)
+    if extracted_fact:
+        await save_fact(user_id, extracted_fact)
+
+    # 2. Получаем контекст
+    facts = await get_user_facts(user_id)
+    role = user_roles.get(user_id, ROLES["standard"])
+    
+    # 3. Генерируем ответ
+    plan = await ai_service.get_plan(user_id, text, role_prompt=role, user_facts=facts)
     await msg.delete()
+    
     await send_plan_response(update, plan, "Текст", text)
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,9 +190,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await photo_file.download_to_memory(stream)
     stream.seek(0)
     
-    role = user_roles.get(update.effective_user.id, ROLES["standard"])
+    user_id = update.effective_user.id
+    role = user_roles.get(user_id, ROLES["standard"])
     caption = update.message.caption or "Анализ фото"
-    plan = await ai_service.get_plan(update.effective_user.id, caption, role_prompt=role, image_file=stream)
+    
+    # Используем факты и для фото
+    facts = await get_user_facts(user_id)
+    
+    plan = await ai_service.get_plan(user_id, caption, role_prompt=role, image_file=stream, user_facts=facts)
     await msg.delete()
     await send_plan_response(update, plan, "Фото", caption)
 
@@ -155,12 +207,17 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stream = io.BytesIO()
     await voice_file.download_to_memory(stream)
     stream.seek(0)
-    role = user_roles.get(update.effective_user.id, ROLES["standard"])
-    plan = await ai_service.get_plan(update.effective_user.id, "Голосовое сообщение", role_prompt=role, audio_file=stream)
+    
+    user_id = update.effective_user.id
+    role = user_roles.get(user_id, ROLES["standard"])
+    facts = await get_user_facts(user_id)
+    
+    plan = await ai_service.get_plan(user_id, "Голосовое сообщение", role_prompt=role, audio_file=stream, user_facts=facts)
     await msg.delete()
     await send_plan_response(update, plan, "Голос", "Голосовая задача")
 
-# --- ОБРАБОТКА КНОПОК ---
+# --- КНОПКИ (CALLBACKS) ---
+
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
