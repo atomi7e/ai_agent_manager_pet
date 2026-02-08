@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # --- СЕРВИС 1: Веб-сайт (Mini App) ---
+  web_app:
+    build: .
+    # Запускаем uvicorn на 0.0.0.0 (обязательно для Докера!)
+    command: python -m uvicorn src.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"  # Пробрасываем порт наружу
+    volumes:
+      - ./planner.db:/app/planner.db # Сохраняем базу данных на диск
+    restart: always
+
+  # --- СЕРВИС 2: Телеграм Бот ---
+  telegram_bot:
+    build: .
+    command: python -m src.main
+    volumes:
+      - ./planner.db:/app/planner.db # Используем ту же базу данных
+    depends_on:
+      - web_app # Ждем запуска сайта
+    restart: always

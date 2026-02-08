@@ -1,4 +1,8 @@
-google-generativeai
 python-telegram-bot
-python-dotenv
+google-generativeai
+fastapi
+uvicorn
+jinja2
 aiosqlite
+pillow
+requests
